@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { createPost } from '../services/firestoreService';
 import './PostForm.css';
 
-function PostForm() {
+function PostForm({ user, onPostCreated }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [content, setContent] = useState('');
   const [context, setContext] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -17,11 +19,42 @@ function PostForm() {
     }
   };
 
-  const handleGeneratePost = () => {
-    // Fonctionnalité à ajouter plus tard
-    console.log("Generate Post clicked");
-    console.log("Content:", content);
-    console.log("Context:", context);
+  const handleGeneratePost = async () => {
+    // Validation
+    if (!content.trim()) {
+      alert("Veuillez entrer du contenu");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Créer le post dans Firestore
+      await createPost(
+        user.uid,
+        content,
+        context,
+        imagePreview || "" // Pour l'instant on stocke le base64, Section 4 utilisera Storage
+      );
+
+      // Réinitialiser le formulaire
+      setContent('');
+      setContext('');
+      setImagePreview(null);
+      
+      alert("Post créé avec succès! ✅");
+      
+      // Notifier le parent pour rafraîchir la liste
+      if (onPostCreated) {
+        onPostCreated();
+      }
+      
+    } catch (error) {
+      console.error("Erreur:", error);
+      alert("Erreur lors de la création du post");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,8 +116,9 @@ function PostForm() {
       <button 
         className="btn-generate"
         onClick={handleGeneratePost}
+        disabled={loading}
       >
-        ✨ Generate Post
+        {loading ? "Création..." : "✨ Generate Post"}
       </button>
     </div>
   );

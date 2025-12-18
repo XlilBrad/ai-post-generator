@@ -4,10 +4,12 @@ import { auth } from './firebaseConfig';
 import Auth from './components/Auth';
 import Navbar from './components/Navbar';
 import PostForm from './components/PostForm';
+import PostList from './components/PostList';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -17,6 +19,11 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  const handlePostCreated = () => {
+    // Incrémenter pour déclencher le refresh de PostList
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   if (loading) {
     return (
@@ -44,7 +51,8 @@ function App() {
         <div className="main-app">
           <Navbar user={user} />
           <main className="main-content">
-            <PostForm />
+            <PostForm user={user} onPostCreated={handlePostCreated} />
+            <PostList user={user} refreshTrigger={refreshTrigger} />
           </main>
         </div>
       )}
