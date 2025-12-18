@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { createPost } from '../services/firestoreService';
+import { createPost, updatePost } from '../services/firestoreService';
 import { uploadImage } from '../services/storageService';
+import { improvePostWithAI } from '../services/openaiservice';
 import './PostForm.css';
 
 function PostForm({ user, onPostCreated }) {
@@ -8,7 +9,9 @@ function PostForm({ user, onPostCreated }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [content, setContent] = useState('');
   const [context, setContext] = useState('');
+  const [improvedContent, setImprovedContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentPostId, setCurrentPostId] = useState(null);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -34,39 +37,48 @@ function PostForm({ user, onPostCreated }) {
     try {
       setLoading(true);
       
-      let imageURL = "";
+      // 1. Appeler OpenAI pour améliorer le texte
+      console.log("Appel OpenAI pour améliorer le texte...");
+      const aiImprovedText = await improvePostWithAI(content, context);
+      setImprovedContent(aiImprovedText);
       
-      // Upload image vers Storage si présente
+      // 2. Upload image vers Storage si présente
+      let imageURL = "";
       if (imageFile) {
         console.log("Upload de l'image vers Storage...");
         imageURL = await uploadImage(imageFile, user.uid);
-        console.log("Image uploadée, URL:", imageURL);
       }
       
-      // Créer le post dans Firestore avec l'URL de Storage
-      await createPost(
+      // 3. Créer le post dans Firestore
+      const postId = await createPost(
         user.uid,
         content,
         context,
         imageURL
       );
-
-      // Réinitialiser le formulaire
-      setContent('');
-      setContext('');
-      setImageFile(null);
-      setImagePreview(null);
       
-      alert("Post créé avec succès! ✅");
+      // 4. Mettre à jour le post avec le contenu amélioré par l'IA
+      await updatePost(postId, {
+        improvedContent: aiImprovedText
+      });
+      
+      setCurrentPostId(postId);
+      alert("Post créé et amélioré par l'IA! ✅");
       
       // Notifier le parent pour rafraîchir la liste
       if (onPostCreated) {
         onPostCreated();
       }
       
+      // Réinitialiser uniquement les champs d'input (garder le résultat affiché)
+      setContent('');
+      setContext('');
+      setImageFile(null);
+      setImagePreview(null);
+      
     } catch (error) {
       console.error("Erreur:", error);
-      alert("Erreur lors de la création du post");
+      alert(error.message || "Erreur lors de la création du post");
     } finally {
       setLoading(false);
     }
@@ -136,8 +148,19 @@ function PostForm({ user, onPostCreated }) {
         onClick={handleGeneratePost}
         disabled={loading}
       >
-        {loading ? "⏳ Création en cours..." : "✨ Generate Post"}
+        {loading ? "⏳ L'IA travaille..." : "✨ Generate Post"}
       </button>
+
+      {/* Affichage du résultat IA */}
+      {improvedContent && (
+        <div className="ai-result">
+          <h3>✨ Résultat amélioré par l'IA:</h3>
+          <div className="ai-content">
+            {improvedContent}
+          </div>
+          <p className="ai-note">Le post a été sauvegardé avec ce contenu amélioré!</p>
+        </div>
+      )}
     </div>
   );
 }
