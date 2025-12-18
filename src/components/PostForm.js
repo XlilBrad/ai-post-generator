@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { createPost } from '../services/firestoreService';
+import { uploadImage } from '../services/storageService';
 import './PostForm.css';
 
 function PostForm({ user, onPostCreated }) {
+  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [content, setContent] = useState('');
   const [context, setContext] = useState('');
@@ -11,6 +13,9 @@ function PostForm({ user, onPostCreated }) {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setImageFile(file);
+      
+      // Créer preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -29,17 +34,27 @@ function PostForm({ user, onPostCreated }) {
     try {
       setLoading(true);
       
-      // Créer le post dans Firestore
+      let imageURL = "";
+      
+      // Upload image vers Storage si présente
+      if (imageFile) {
+        console.log("Upload de l'image vers Storage...");
+        imageURL = await uploadImage(imageFile, user.uid);
+        console.log("Image uploadée, URL:", imageURL);
+      }
+      
+      // Créer le post dans Firestore avec l'URL de Storage
       await createPost(
         user.uid,
         content,
         context,
-        imagePreview || "" // Pour l'instant on stocke le base64, Section 4 utilisera Storage
+        imageURL
       );
 
       // Réinitialiser le formulaire
       setContent('');
       setContext('');
+      setImageFile(null);
       setImagePreview(null);
       
       alert("Post créé avec succès! ✅");
@@ -69,7 +84,10 @@ function PostForm({ user, onPostCreated }) {
               <img src={imagePreview} alt="Preview" />
               <button 
                 className="btn-remove-image"
-                onClick={() => setImagePreview(null)}
+                onClick={() => {
+                  setImagePreview(null);
+                  setImageFile(null);
+                }}
               >
                 ✕
               </button>
@@ -118,7 +136,7 @@ function PostForm({ user, onPostCreated }) {
         onClick={handleGeneratePost}
         disabled={loading}
       >
-        {loading ? "Création..." : "✨ Generate Post"}
+        {loading ? "⏳ Création en cours..." : "✨ Generate Post"}
       </button>
     </div>
   );
